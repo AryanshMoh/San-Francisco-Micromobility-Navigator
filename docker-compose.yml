@@ -1,0 +1,105 @@
+version: '3.8'
+
+services:
+  # PostgreSQL with PostGIS extension
+  db:
+    image: postgis/postgis:15-3.3
+    container_name: micromobility-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-micromobility}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-devpassword}
+      POSTGRES_DB: ${POSTGRES_DB:-micromobility_nav}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-micromobility} -d ${POSTGRES_DB:-micromobility_nav}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for caching
+  redis:
+    image: redis:7-alpine
+    container_name: micromobility-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Valhalla Routing Engine
+  valhalla:
+    image: ghcr.io/gis-ops/docker-valhalla/valhalla:latest
+    container_name: micromobility-valhalla
+    ports:
+      - "8002:8002"
+    volumes:
+      - ./routing-engine/valhalla_tiles:/custom_files/valhalla_tiles
+      - ./routing-engine/valhalla.json:/custom_files/valhalla.json:ro
+      - ./backend/data/osm:/custom_files/osm:ro
+    environment:
+      - tile_urls=https://download.geofabrik.de/north-america/us/california/norcal-latest.osm.pbf
+      - serve_tiles=True
+      - build_elevation=True
+      - build_admins=True
+      - build_time_zones=True
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+
+  # FastAPI Backend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: micromobility-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-micromobility}:${POSTGRES_PASSWORD:-devpassword}@db:5432/${POSTGRES_DB:-micromobility_nav}
+      - REDIS_URL=redis://redis:6379/0
+      - VALHALLA_URL=http://valhalla:8002
+      - DEBUG=true
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # React Frontend (development)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: micromobility-frontend
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_URL=http://localhost:8000
+      - VITE_MAPBOX_TOKEN=${MAPBOX_ACCESS_TOKEN}
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  redis_data:
