@@ -1,0 +1,37 @@
+# Standalone Valhalla service for development
+# Usage: docker compose -f routing-engine/docker-compose.valhalla.yml up
+version: '3.8'
+
+services:
+  valhalla:
+    image: ghcr.io/gis-ops/docker-valhalla/valhalla:latest
+    container_name: micromobility-valhalla-dev
+    ports:
+      - "8002:8002"
+    volumes:
+      - valhalla_tiles:/custom_files/valhalla_tiles
+      - ./valhalla.json:/custom_files/valhalla.json:ro
+    environment:
+      # Download NorCal OSM data covering San Francisco Bay Area
+      - tile_urls=https://download.geofabrik.de/north-america/us/california/norcal-latest.osm.pbf
+      - serve_tiles=True
+      - build_elevation=True
+      - build_admins=True
+      - build_time_zones=True
+      - force_rebuild=False
+      - use_tiles_ignore_pbf=True
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 300s
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+    restart: unless-stopped
+
+volumes:
+  valhalla_tiles:
+    name: micromobility-valhalla-tiles

@@ -45,8 +45,8 @@ class RoutePreferences(BaseModel):
         description="Maximum acceptable grade percentage",
     )
     prefer_bike_lanes: bool = Field(
-        default=True,
-        description="Prefer routes with bike lanes",
+        default=False,
+        description="Restrict to bike lanes only (toggle). When False, uses roads and bike lanes.",
     )
     bike_lane_weight: float = Field(
         default=0.7,

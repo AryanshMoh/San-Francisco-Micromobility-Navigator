@@ -2,7 +2,48 @@ import { useEffect, useState } from 'react';
 import { Marker, Popup } from 'react-map-gl';
 import { useMapStore } from '../../store/mapStore';
 import { getRiskZonesInArea } from '../../api/riskZones';
-import { RiskZone, SEVERITY_COLORS, HAZARD_TYPE_INFO } from '../../types';
+import { RiskZone, SEVERITY_COLORS, HAZARD_TYPE_INFO, HazardType } from '../../types';
+import {
+  CircleDot,
+  AlertTriangle,
+  RotateCcw,
+  SquareDashed,
+  Construction,
+  Car,
+  Mountain,
+  MoveHorizontal,
+  DoorOpen,
+  TrainTrack,
+  CableCar,
+  Bus,
+  Users,
+  Zap,
+  LucideIcon,
+} from 'lucide-react';
+
+// Map icon names to Lucide components
+const HAZARD_ICONS: Record<string, LucideIcon> = {
+  'circle-dot': CircleDot,
+  'alert-triangle': AlertTriangle,
+  'rotate-ccw': RotateCcw,
+  'square-dashed': SquareDashed,
+  'construction': Construction,
+  'car': Car,
+  'mountain': Mountain,
+  'move-horizontal': MoveHorizontal,
+  'door-open': DoorOpen,
+  'train-track': TrainTrack,
+  'cable-car': CableCar,
+  'bus': Bus,
+  'users': Users,
+  'zap': Zap,
+};
+
+function HazardIcon({ hazardType, className, style }: { hazardType: HazardType; className?: string; style?: React.CSSProperties }) {
+  const iconName = HAZARD_TYPE_INFO[hazardType].iconName;
+  const Icon = HAZARD_ICONS[iconName] || AlertTriangle;
+  return <Icon className={className} style={style} />;
+}
 
 export default function RiskZoneLayer() {
   const [riskZones, setRiskZones] = useState<RiskZone[]>([]);
@@ -13,7 +54,6 @@ export default function RiskZoneLayer() {
   useEffect(() => {
     const fetchZones = async () => {
       // Calculate bounding box from current view
-      // This is a simplified calculation - in production you'd use the actual map bounds
       const buffer = 0.05; // roughly 5km at SF latitude
       const bbox = [
         viewState.longitude - buffer,
@@ -59,11 +99,11 @@ export default function RiskZoneLayer() {
             }}
           >
             <div
-              className="risk-zone-marker"
+              className="w-7 h-7 rounded-full flex items-center justify-center border-2 border-white shadow-md cursor-pointer transition-transform hover:scale-110"
               style={{ backgroundColor: color }}
               title={hazardInfo.label}
             >
-              <span className="text-xs">{hazardInfo.icon}</span>
+              <HazardIcon hazardType={zone.hazardType} className="w-3.5 h-3.5 text-white" />
             </div>
           </Marker>
         );
@@ -79,17 +119,24 @@ export default function RiskZoneLayer() {
           closeButton
           closeOnClick={false}
         >
-          <div className="p-2 min-w-[200px]">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-xl">
-                {HAZARD_TYPE_INFO[selectedZone.hazardType].icon}
-              </span>
+          <div className="p-3 min-w-[220px]">
+            <div className="flex items-center gap-3 mb-3">
+              <div
+                className="w-10 h-10 rounded-xl flex items-center justify-center"
+                style={{ backgroundColor: `${SEVERITY_COLORS[selectedZone.severity]}20` }}
+              >
+                <HazardIcon
+                  hazardType={selectedZone.hazardType}
+                  className="w-5 h-5"
+                  style={{ color: SEVERITY_COLORS[selectedZone.severity] }}
+                />
+              </div>
               <div>
-                <h3 className="font-semibold text-sm">
+                <h3 className="font-semibold text-sm text-slate-800">
                   {HAZARD_TYPE_INFO[selectedZone.hazardType].label}
                 </h3>
                 <span
-                  className="text-xs px-2 py-0.5 rounded-full text-white"
+                  className="text-2xs px-2 py-0.5 rounded-full text-white font-medium uppercase tracking-wide"
                   style={{ backgroundColor: SEVERITY_COLORS[selectedZone.severity] }}
                 >
                   {selectedZone.severity}
@@ -97,15 +144,15 @@ export default function RiskZoneLayer() {
               </div>
             </div>
             {selectedZone.description && (
-              <p className="text-xs text-gray-600 mt-1">{selectedZone.description}</p>
+              <p className="text-xs text-slate-500 leading-relaxed">{selectedZone.description}</p>
             )}
             {selectedZone.alertMessage && (
-              <p className="text-xs text-gray-800 mt-1 font-medium">
+              <p className="text-xs text-slate-700 mt-2 font-medium">
                 {selectedZone.alertMessage}
               </p>
             )}
-            <p className="text-xs text-gray-400 mt-2">
-              Reported {selectedZone.reportedCount} time(s)
+            <p className="text-2xs text-slate-400 mt-3">
+              Reported {selectedZone.reportedCount} time{selectedZone.reportedCount !== 1 ? 's' : ''}
             </p>
           </div>
         </Popup>

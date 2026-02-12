@@ -41,21 +41,24 @@ services:
     ports:
       - "8002:8002"
     volumes:
-      - ./routing-engine/valhalla_tiles:/custom_files/valhalla_tiles
-      - ./routing-engine/valhalla.json:/custom_files/valhalla.json:ro
-      - ./backend/data/osm:/custom_files/osm:ro
+      - valhalla_tiles:/custom_files/valhalla_tiles
     environment:
-      - tile_urls=https://download.geofabrik.de/north-america/us/california/norcal-latest.osm.pbf
+      # Download SF Bay Area extract from BBBike (smaller, focused on SF metro)
+      - tile_urls=https://download.bbbike.org/osm/bbbike/SanFrancisco/SanFrancisco.osm.pbf
       - serve_tiles=True
-      - build_elevation=True
-      - build_admins=True
-      - build_time_zones=True
+      - build_elevation=False
+      - build_admins=False
+      - build_time_zones=False
+      # Force rebuild if tiles don't exist
+      - force_rebuild=False
+      # Use custom config file
+      - use_tiles_ignore_pbf=True
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8002/status"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 120s
+      start_period: 600s
 
   # FastAPI Backend
   backend:
@@ -103,3 +106,4 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  valhalla_tiles:

@@ -15,8 +15,10 @@ export async function apiRequest<T>(
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: 'Request failed' }));
-    throw new Error(error.detail || `HTTP error ${response.status}`);
+    const errorData = await response.json().catch(() => ({ detail: 'Request failed' }));
+    // Handle both FastAPI default format and our custom error format
+    const message = errorData.error?.message || errorData.detail || `HTTP error ${response.status}`;
+    throw new Error(message);
   }
 
   return response.json();

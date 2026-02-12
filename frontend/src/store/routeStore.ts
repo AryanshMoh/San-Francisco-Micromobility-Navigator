@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Coordinate, Route, RoutePreferences, RouteProfile } from '../types';
+import { Coordinate, Route, RoutePreferences } from '../types';
 
 interface RouteState {
   origin: Coordinate | null;
@@ -27,7 +27,7 @@ const defaultPreferences: RoutePreferences = {
   profile: 'balanced',
   avoidHills: false,
   maxGradePercent: 15,
-  preferBikeLanes: true,
+  preferBikeLanes: false,  // Off by default - toggle on for bike-lane-only routing
   bikeLaneWeight: 0.7,
 };
 

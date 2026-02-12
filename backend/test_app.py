@@ -53,6 +53,7 @@ class RouteSummary(BaseModel):
     duration_seconds: int
     elevation_gain_meters: int = 0
     elevation_loss_meters: int = 0
+    max_grade_percent: float = 0
     bike_lane_percentage: float = 0
     risk_score: float = 0
 
@@ -179,8 +180,9 @@ async def calculate_route(request: RouteRequest):
             duration_seconds=duration_seconds,
             elevation_gain_meters=50 if not request.preferences.avoid_hills else 10,
             elevation_loss_meters=30 if not request.preferences.avoid_hills else 5,
+            max_grade_percent=8 if not request.preferences.avoid_hills else 3,
             bike_lane_percentage=bike_lane_pct,
-            risk_score=0.2 if request.preferences.profile == RouteProfile.SAFEST else 0.4,
+            risk_score=0.1 if request.preferences.profile == RouteProfile.SAFEST else 0.3 if request.preferences.profile == RouteProfile.BALANCED else 0.5,
         ),
         risk_analysis=RiskAnalysis(
             total_risk_zones=risk_zones_count,

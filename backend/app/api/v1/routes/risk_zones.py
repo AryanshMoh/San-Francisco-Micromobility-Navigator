@@ -4,8 +4,11 @@ from typing import List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Depends, Query
-from geoalchemy2.functions import ST_DWithin, ST_Distance, ST_MakePoint, ST_SetSRID
-from sqlalchemy import select, and_
+from geoalchemy2.functions import (
+    ST_DWithin, ST_Distance, ST_MakePoint, ST_SetSRID,
+    ST_MakeEnvelope, ST_Intersects, ST_Buffer, ST_GeomFromGeoJSON
+)
+from sqlalchemy import select, and_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
@@ -43,10 +46,19 @@ async def get_risk_zones(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    # Build query
-    query = select(RiskZone).where(RiskZone.is_active == True)
-
-    # TODO: Add spatial filter using ST_Within or ST_Intersects with bbox
+    # Build query with spatial bbox filter
+    # ST_MakeEnvelope creates a box from (minLon, minLat, maxLon, maxLat)
+    bbox_envelope = ST_MakeEnvelope(
+        bounds.min_lon, bounds.min_lat,
+        bounds.max_lon, bounds.max_lat,
+        4326  # SRID for WGS84
+    )
+    query = select(RiskZone).where(
+        and_(
+            RiskZone.is_active == True,
+            ST_Intersects(RiskZone.geometry, bbox_envelope)
+        )
+    )
 
     # Filter by severity
     if severity:
@@ -60,7 +72,7 @@ async def get_risk_zones(
         type_list = [t.strip() for t in types.split(",")]
         query = query.where(RiskZone.hazard_type.in_(type_list))
 
-    result = await db.execute(query.limit(500))
+    result = await db.execute(query.limit(2000))
     zones = result.scalars().all()
 
     # Convert to response format
@@ -129,14 +141,62 @@ async def get_risk_zones_along_route(
 ) -> dict:
     """
     Get risk zones that a route passes through or near.
+
+    Creates a buffer around the route geometry and finds all risk zones
+    that intersect with this buffered area.
     """
-    # TODO: Implement spatial query for route buffer
-    # This would use ST_Buffer on the route and ST_Intersects with risk zones
+    import json
+
+    # Convert GeoJSON LineString to PostGIS geometry
+    geojson_str = json.dumps({
+        "type": route_geometry.type,
+        "coordinates": route_geometry.coordinates
+    })
+
+    # Create route geometry with buffer (in meters, using geography for accurate distance)
+    # ST_Buffer on geography type uses meters directly
+    route_geom = ST_SetSRID(ST_GeomFromGeoJSON(geojson_str), 4326)
+    route_buffer = ST_Buffer(
+        func.cast(route_geom, func.geography),
+        buffer_meters
+    )
+
+    # Query for risk zones that intersect with the buffered route
+    query = (
+        select(
+            RiskZone,
+            ST_Distance(
+                RiskZone.geometry.cast_to_geography(),
+                func.cast(route_geom, func.geography)
+            ).label("distance")
+        )
+        .where(
+            and_(
+                RiskZone.is_active == True,
+                ST_Intersects(
+                    RiskZone.geometry.cast_to_geography(),
+                    route_buffer
+                )
+            )
+        )
+        .order_by("distance")
+    )
+
+    result = await db.execute(query)
+    rows = result.all()
+
+    zones = [
+        {
+            "risk_zone": _zone_to_response(row.RiskZone),
+            "distance_meters": round(row.distance, 1),
+        }
+        for row in rows
+    ]
 
     return {
-        "zones": [],
-        "total": 0,
-        "message": "Route risk zone query not yet implemented",
+        "zones": zones,
+        "total": len(zones),
+        "buffer_meters": buffer_meters,
     }
 
 

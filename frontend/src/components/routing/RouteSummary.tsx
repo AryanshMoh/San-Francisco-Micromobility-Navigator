@@ -1,107 +1,91 @@
+import { memo } from 'react';
 import { RouteSummary as RouteSummaryType } from '../../types';
+import { Route, Bike, TrendingUp, TrendingDown, Mountain } from 'lucide-react';
 
 interface RouteSummaryProps {
   summary: RouteSummaryType;
 }
 
-export default function RouteSummary({ summary }: RouteSummaryProps) {
+// [rerender-memo] Memoize to prevent re-renders when RoutePanel state changes
+export default memo(function RouteSummary({ summary }: RouteSummaryProps) {
+  // Defensive defaults for all values
+  const durationSeconds = summary?.durationSeconds ?? 0;
+  const distanceMeters = summary?.distanceMeters ?? 0;
+  const bikeLanePercentage = summary?.bikeLanePercentage ?? 0;
+  const elevationGainMeters = summary?.elevationGainMeters ?? 0;
+  const elevationLossMeters = summary?.elevationLossMeters ?? 0;
+  const maxGradePercent = summary?.maxGradePercent ?? 0;
+
   return (
-    <div className="bg-gray-50 rounded-lg p-4">
+    <div className="bg-slate-50 rounded-xl p-4">
       {/* Main stats */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between">
         <div>
-          <p className="text-2xl font-bold text-gray-900">
-            {formatDuration(summary.durationSeconds)}
-          </p>
-          <p className="text-sm text-gray-500">
-            {formatDistance(summary.distanceMeters)}
-          </p>
-        </div>
-        <div className="text-right">
-          <div className="flex items-center gap-1 text-primary-600">
-            <span className="text-lg">🚴</span>
-            <span className="font-medium">
-              {summary.bikeLanePercentage.toFixed(0)}%
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-2xl font-semibold text-slate-900 tracking-tight">
+              {formatDuration(durationSeconds)}
             </span>
           </div>
-          <p className="text-xs text-gray-500">bike lanes</p>
+          <div className="flex items-center gap-1.5 mt-0.5">
+            <Route className="w-3.5 h-3.5 text-slate-400" />
+            <span className="text-sm text-slate-500">
+              {formatDistance(distanceMeters)}
+            </span>
+          </div>
+        </div>
+
+        <div className="text-right">
+          <div className="flex items-center gap-1.5 justify-end">
+            <div className="w-7 h-7 bg-accent-100 rounded-lg flex items-center justify-center">
+              <Bike className="w-4 h-4 text-accent-600" />
+            </div>
+            <span className="text-lg font-semibold text-accent-600">
+              {bikeLanePercentage.toFixed(0)}%
+            </span>
+          </div>
+          <p className="text-xs text-slate-400 mt-0.5">bike lanes</p>
         </div>
       </div>
 
       {/* Detailed stats */}
-      <div className="grid grid-cols-3 gap-4 pt-3 border-t border-gray-200">
+      <div className="grid grid-cols-3 gap-3 mt-4 pt-4 border-t border-slate-200/60">
         {/* Elevation gain */}
         <div className="text-center">
-          <div className="flex items-center justify-center gap-1 text-gray-700">
-            <span>↗️</span>
-            <span className="font-medium">{summary.elevationGainMeters}m</span>
+          <div className="flex items-center justify-center gap-1.5">
+            <TrendingUp className="w-3.5 h-3.5 text-slate-400" />
+            <span className="text-sm font-medium text-slate-700">
+              {elevationGainMeters}m
+            </span>
           </div>
-          <p className="text-xs text-gray-500">climb</p>
+          <p className="text-2xs text-slate-400 mt-0.5">climb</p>
         </div>
 
         {/* Elevation loss */}
         <div className="text-center">
-          <div className="flex items-center justify-center gap-1 text-gray-700">
-            <span>↘️</span>
-            <span className="font-medium">{summary.elevationLossMeters}m</span>
+          <div className="flex items-center justify-center gap-1.5">
+            <TrendingDown className="w-3.5 h-3.5 text-slate-400" />
+            <span className="text-sm font-medium text-slate-700">
+              {elevationLossMeters}m
+            </span>
           </div>
-          <p className="text-xs text-gray-500">descent</p>
+          <p className="text-2xs text-slate-400 mt-0.5">descent</p>
         </div>
 
         {/* Max grade */}
         <div className="text-center">
-          <div className="flex items-center justify-center gap-1 text-gray-700">
-            <span>⛰️</span>
-            <span className="font-medium">{summary.maxGradePercent.toFixed(0)}%</span>
+          <div className="flex items-center justify-center gap-1.5">
+            <Mountain className="w-3.5 h-3.5 text-slate-400" />
+            <span className="text-sm font-medium text-slate-700">
+              {maxGradePercent.toFixed(0)}%
+            </span>
           </div>
-          <p className="text-xs text-gray-500">max grade</p>
+          <p className="text-2xs text-slate-400 mt-0.5">max grade</p>
         </div>
       </div>
 
-      {/* Safety score */}
-      <div className="mt-4 pt-3 border-t border-gray-200">
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-gray-600">Safety Score</span>
-          <SafetyIndicator score={1 - summary.riskScore} />
-        </div>
-      </div>
     </div>
   );
-}
-
-function SafetyIndicator({ score }: { score: number }) {
-  // Score is 0-1 where 1 is safest
-  const percentage = score * 100;
-  const color =
-    percentage >= 80
-      ? 'bg-green-500'
-      : percentage >= 60
-      ? 'bg-yellow-500'
-      : percentage >= 40
-      ? 'bg-orange-500'
-      : 'bg-red-500';
-
-  const label =
-    percentage >= 80
-      ? 'Safe'
-      : percentage >= 60
-      ? 'Moderate'
-      : percentage >= 40
-      ? 'Caution'
-      : 'Risky';
-
-  return (
-    <div className="flex items-center gap-2">
-      <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
-        <div
-          className={`h-full ${color} rounded-full transition-all duration-300`}
-          style={{ width: `${percentage}%` }}
-        />
-      </div>
-      <span className="text-sm font-medium text-gray-700">{label}</span>
-    </div>
-  );
-}
+});
 
 function formatDuration(seconds: number): string {
   const minutes = Math.round(seconds / 60);

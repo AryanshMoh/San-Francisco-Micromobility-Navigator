@@ -40,8 +40,8 @@ const SF_CENTER = {
 
 export const useMapStore = create<MapState>((set) => ({
   viewState: SF_CENTER,
-  showBikeLanes: true,
-  showRiskZones: true,
+  showBikeLanes: false,
+  showRiskZones: false,
   showTraffic: false,
   isFollowingUser: false,
   selectedRiskZoneId: null,

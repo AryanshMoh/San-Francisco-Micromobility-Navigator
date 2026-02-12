@@ -1,3 +1,4 @@
+import { useMemo, memo } from 'react';
 import { Layer, Source } from 'react-map-gl';
 import { Route } from '../../types';
 
@@ -6,23 +7,30 @@ interface RouteLayerProps {
   isAlternative?: boolean;
 }
 
-export default function RouteLayer({ route, isAlternative = false }: RouteLayerProps) {
-  // Convert route geometry to GeoJSON format for Mapbox
-  const geojson = {
+// [rerender-memo] Memoize to prevent re-renders from parent MapContainer
+export default memo(function RouteLayer({ route, isAlternative = false }: RouteLayerProps) {
+  // Don't render if route or geometry is invalid
+  if (!route?.geometry?.coordinates?.length) {
+    return null;
+  }
+
+  // [rerender-memo] Memoize GeoJSON to avoid new object reference on every render
+  const geojson = useMemo(() => ({
     type: 'Feature' as const,
     properties: {},
     geometry: route.geometry,
-  };
+  }), [route.geometry]);
 
-  const lineColor = isAlternative ? '#9ca3af' : '#16a34a'; // Gray for alternatives, green for main
+  const lineColor = isAlternative ? '#9ca3af' : '#16a34a';
   const lineWidth = isAlternative ? 4 : 6;
   const lineOpacity = isAlternative ? 0.6 : 1;
+  const sourceId = isAlternative ? 'route-alternative' : 'route-main';
 
   return (
-    <Source id={`route-${route.routeId}`} type="geojson" data={geojson}>
+    <Source id={sourceId} type="geojson" data={geojson}>
       {/* Route outline (border) */}
       <Layer
-        id={`route-outline-${route.routeId}`}
+        id={`${sourceId}-outline`}
         type="line"
         paint={{
           'line-color': '#ffffff',
@@ -37,7 +45,7 @@ export default function RouteLayer({ route, isAlternative = false }: RouteLayerP
 
       {/* Main route line */}
       <Layer
-        id={`route-line-${route.routeId}`}
+        id={`${sourceId}-line`}
         type="line"
         paint={{
           'line-color': lineColor,
@@ -52,7 +60,7 @@ export default function RouteLayer({ route, isAlternative = false }: RouteLayerP
 
       {/* Route direction arrows */}
       <Layer
-        id={`route-arrows-${route.routeId}`}
+        id={`${sourceId}-arrows`}
         type="symbol"
         layout={{
           'symbol-placement': 'line',
@@ -64,4 +72,4 @@ export default function RouteLayer({ route, isAlternative = false }: RouteLayerP
       />
     </Source>
   );
-}
+});

@@ -6,14 +6,16 @@ from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Depends, Query
 from geoalchemy2.shape import from_shape
+from geoalchemy2.functions import ST_DWithin, ST_Distance, ST_MakePoint, ST_SetSRID
 from shapely.geometry import Point
 from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
 from app.models.hazard_report import HazardReport, ReportStatus, ReportVerification
-from app.models.risk_zone import HazardType, HazardSeverity
+from app.models.risk_zone import RiskZone, HazardType, HazardSeverity, DataSource
 from app.schemas.common import Coordinate
+from app.services.risk_zone_service import risk_zone_service
 
 router = APIRouter()
 
@@ -144,6 +146,7 @@ async def verify_report(
     db.add(verification)
 
     # Update verification count
+    risk_zone_created = False
     if is_confirmed:
         report.verification_count += 1
 
@@ -151,17 +154,45 @@ async def verify_report(
         if report.verification_count >= 3 and report.status == ReportStatus.PENDING:
             report.status = ReportStatus.VERIFIED
             report.verified_at = datetime.utcnow()
-            # TODO: Create risk zone from verified report
+
+            # Create risk zone from verified report
+            risk_zone = RiskZone(
+                geometry=report.location,
+                hazard_type=report.hazard_type,
+                severity=report.severity,
+                name=f"User-reported {report.hazard_type.value.replace('_', ' ')}",
+                description=report.description,
+                is_permanent=False,  # User reports default to temporary
+                alert_radius_meters=50,  # Default alert radius for user reports
+                alert_message=f"Caution: {report.hazard_type.value.replace('_', ' ')} reported by users",
+                source=DataSource.USER_REPORT,
+                source_id=str(report.id),
+                confidence_score=0.7 + (0.1 * min(report.verification_count - 3, 3)),  # 0.7-1.0 based on verifications
+                reported_count=report.verification_count,
+                last_confirmed_at=datetime.utcnow(),
+                is_active=True,
+            )
+            db.add(risk_zone)
+            risk_zone_created = True
+
+            # Clear risk zone cache so new zone is picked up
+            risk_zone_service.clear_cache()
 
     await db.commit()
 
-    return {
+    response = {
         "report_id": str(report_id),
         "verification_recorded": True,
         "is_confirmed": is_confirmed,
         "total_verifications": report.verification_count,
         "status": report.status.value,
     }
+
+    if risk_zone_created:
+        response["risk_zone_created"] = True
+        response["message"] = "Report verified and risk zone created"
+
+    return response
 
 
 @router.get("/nearby")
@@ -173,13 +204,56 @@ async def get_nearby_reports(
 ) -> dict:
     """
     Get pending reports near a location that user could verify.
+
+    Returns reports within the specified radius that are still pending verification.
     """
-    # TODO: Implement spatial query for nearby pending reports
+    # Build point geometry for spatial query
+    point = ST_SetSRID(ST_MakePoint(lon, lat), 4326)
+
+    # Query for nearby pending reports with distance
+    query = (
+        select(
+            HazardReport,
+            ST_Distance(
+                HazardReport.location.cast_to_geography(),
+                point.cast_to_geography()
+            ).label("distance")
+        )
+        .where(
+            and_(
+                HazardReport.status == ReportStatus.PENDING,
+                ST_DWithin(
+                    HazardReport.location.cast_to_geography(),
+                    point.cast_to_geography(),
+                    radius
+                )
+            )
+        )
+        .order_by("distance")
+        .limit(50)  # Limit results to prevent large payloads
+    )
+
+    result = await db.execute(query)
+    rows = result.all()
+
+    reports = [
+        {
+            "id": str(row.HazardReport.id),
+            "hazard_type": row.HazardReport.hazard_type.value,
+            "severity": row.HazardReport.severity.value,
+            "description": row.HazardReport.description,
+            "distance_meters": round(row.distance, 1),
+            "verification_count": row.HazardReport.verification_count,
+            "reported_at": row.HazardReport.reported_at.isoformat(),
+        }
+        for row in rows
+    ]
 
     return {
-        "reports": [],
-        "total": 0,
-        "message": "Nearby reports query not yet fully implemented",
+        "reports": reports,
+        "total": len(reports),
+        "query_location": {"latitude": lat, "longitude": lon},
+        "query_radius_meters": radius,
     }
 
 

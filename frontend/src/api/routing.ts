@@ -1,9 +1,55 @@
 import { apiRequest } from './index';
 import { Route, RouteRequest, RouteComparison } from '../types';
 
+// Type for API response (snake_case)
+interface ApiRouteResponse {
+  route_id: string;
+  geometry: { type: string; coordinates: number[][] };
+  summary: {
+    distance_meters: number;
+    duration_seconds: number;
+    elevation_gain_meters: number;
+    elevation_loss_meters: number;
+    max_grade_percent: number;
+    bike_lane_percentage: number;
+    risk_score: number;
+  };
+  legs: unknown[];
+  risk_analysis: {
+    total_risk_zones: number;
+    high_severity_zones: number;
+    risk_zone_ids: string[];
+  };
+  warnings: unknown[];
+}
+
+// Convert API response (snake_case) to frontend format (camelCase)
+function convertRouteResponse(response: ApiRouteResponse): Route {
+  return {
+    routeId: response.route_id,
+    geometry: response.geometry as Route['geometry'],
+    summary: {
+      distanceMeters: response.summary.distance_meters,
+      durationSeconds: response.summary.duration_seconds,
+      elevationGainMeters: response.summary.elevation_gain_meters,
+      elevationLossMeters: response.summary.elevation_loss_meters,
+      maxGradePercent: response.summary.max_grade_percent,
+      bikeLanePercentage: response.summary.bike_lane_percentage ?? 0,
+      riskScore: response.summary.risk_score ?? 0,
+    },
+    legs: [],
+    riskAnalysis: {
+      totalRiskZones: response.risk_analysis?.total_risk_zones ?? 0,
+      highSeverityZones: response.risk_analysis?.high_severity_zones ?? 0,
+      riskZoneIds: response.risk_analysis?.risk_zone_ids ?? [],
+    },
+    warnings: [],
+  };
+}
+
 export async function calculateRoute(request: RouteRequest): Promise<Route> {
   // Convert camelCase to snake_case for API
-  const apiRequest_body = {
+  const apiRequestBody = {
     origin: request.origin,
     destination: request.destination,
     vehicle_type: request.vehicleType,
@@ -18,51 +64,19 @@ export async function calculateRoute(request: RouteRequest): Promise<Route> {
     departure_time: request.departureTime,
   };
 
-  const response = await apiRequest<{
-    route_id: string;
-    geometry: { type: string; coordinates: number[][] };
-    summary: {
-      distance_meters: number;
-      duration_seconds: number;
-      elevation_gain_meters: number;
-      elevation_loss_meters: number;
-      max_grade_percent: number;
-      bike_lane_percentage: number;
-      risk_score: number;
-    };
-    legs: unknown[];
-    risk_analysis: {
-      total_risk_zones: number;
-      high_severity_zones: number;
-      risk_zone_ids: string[];
-    };
-    warnings: unknown[];
-  }>('/api/v1/routes/calculate', {
+  console.log('[API] calculateRoute request:', apiRequestBody);
+
+  const response = await apiRequest<ApiRouteResponse>('/api/v1/routes/calculate', {
     method: 'POST',
-    body: JSON.stringify(apiRequest_body),
+    body: JSON.stringify(apiRequestBody),
   });
 
-  // Convert snake_case response to camelCase
-  return {
-    routeId: response.route_id,
-    geometry: response.geometry as Route['geometry'],
-    summary: {
-      distanceMeters: response.summary.distance_meters,
-      durationSeconds: response.summary.duration_seconds,
-      elevationGainMeters: response.summary.elevation_gain_meters,
-      elevationLossMeters: response.summary.elevation_loss_meters,
-      maxGradePercent: response.summary.max_grade_percent,
-      bikeLanePercentage: response.summary.bike_lane_percentage,
-      riskScore: response.summary.risk_score,
-    },
-    legs: [], // TODO: Parse legs properly
-    riskAnalysis: {
-      totalRiskZones: response.risk_analysis.total_risk_zones,
-      highSeverityZones: response.risk_analysis.high_severity_zones,
-      riskZoneIds: response.risk_analysis.risk_zone_ids,
-    },
-    warnings: [],
-  };
+  console.log('[API] calculateRoute raw response:', response);
+
+  const converted = convertRouteResponse(response);
+  console.log('[API] calculateRoute converted:', converted);
+
+  return converted;
 }
 
 export async function getAlternativeRoutes(
@@ -83,7 +97,7 @@ export async function getAlternativeRoutes(
   };
 
   const response = await apiRequest<{
-    routes: unknown[];
+    routes: ApiRouteResponse[];
     comparison: {
       fastest_index: number;
       safest_index: number;
@@ -94,8 +108,11 @@ export async function getAlternativeRoutes(
     body: JSON.stringify(apiRequestBody),
   });
 
+  // Convert each route from snake_case to camelCase
+  const convertedRoutes = response.routes.map(convertRouteResponse);
+
   return {
-    routes: response.routes as Route[], // TODO: Parse properly
+    routes: convertedRoutes,
     comparison: {
       fastestIndex: response.comparison.fastest_index,
       safestIndex: response.comparison.safest_index,

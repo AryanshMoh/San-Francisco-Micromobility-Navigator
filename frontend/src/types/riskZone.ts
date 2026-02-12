@@ -1,5 +1,3 @@
-import { Coordinate } from './route';
-
 export type HazardSeverity = 'low' | 'medium' | 'high' | 'critical';
 
 export type HazardType =
@@ -61,27 +59,44 @@ export interface NearbyRiskZone {
   distanceMeters: number;
 }
 
-// Hazard type display names and colors
-export const HAZARD_TYPE_INFO: Record<HazardType, { label: string; icon: string }> = {
-  pothole: { label: 'Pothole', icon: '🕳️' },
-  dangerous_intersection: { label: 'Dangerous Intersection', icon: '⚠️' },
-  blind_turn: { label: 'Blind Turn', icon: '🔄' },
-  poor_pavement: { label: 'Poor Pavement', icon: '🛤️' },
-  construction: { label: 'Construction', icon: '🚧' },
-  high_traffic: { label: 'High Traffic', icon: '🚗' },
-  steep_grade: { label: 'Steep Hill', icon: '⛰️' },
-  narrow_passage: { label: 'Narrow Passage', icon: '↔️' },
-  door_zone: { label: 'Door Zone', icon: '🚪' },
-  trolley_tracks: { label: 'Trolley Tracks', icon: '🚃' },
-  cable_car_tracks: { label: 'Cable Car Tracks', icon: '🚡' },
-  muni_conflict: { label: 'Muni Conflict', icon: '🚌' },
-  pedestrian_heavy: { label: 'Heavy Pedestrians', icon: '🚶' },
-  other: { label: 'Other Hazard', icon: '⚡' },
+// Lucide icon names for hazard types
+export type HazardIconName =
+  | 'circle-dot'
+  | 'alert-triangle'
+  | 'rotate-ccw'
+  | 'square-dashed'
+  | 'construction'
+  | 'car'
+  | 'mountain'
+  | 'move-horizontal'
+  | 'door-open'
+  | 'train-track'
+  | 'cable-car'
+  | 'bus'
+  | 'users'
+  | 'zap';
+
+// Hazard type display info
+export const HAZARD_TYPE_INFO: Record<HazardType, { label: string; iconName: HazardIconName }> = {
+  pothole: { label: 'Pothole', iconName: 'circle-dot' },
+  dangerous_intersection: { label: 'Dangerous Intersection', iconName: 'alert-triangle' },
+  blind_turn: { label: 'Blind Turn', iconName: 'rotate-ccw' },
+  poor_pavement: { label: 'Poor Pavement', iconName: 'square-dashed' },
+  construction: { label: 'Construction', iconName: 'construction' },
+  high_traffic: { label: 'High Traffic', iconName: 'car' },
+  steep_grade: { label: 'Steep Hill', iconName: 'mountain' },
+  narrow_passage: { label: 'Narrow Passage', iconName: 'move-horizontal' },
+  door_zone: { label: 'Door Zone', iconName: 'door-open' },
+  trolley_tracks: { label: 'Trolley Tracks', iconName: 'train-track' },
+  cable_car_tracks: { label: 'Cable Car Tracks', iconName: 'cable-car' },
+  muni_conflict: { label: 'Muni Conflict', iconName: 'bus' },
+  pedestrian_heavy: { label: 'Heavy Pedestrians', iconName: 'users' },
+  other: { label: 'Other Hazard', iconName: 'zap' },
 };
 
 export const SEVERITY_COLORS: Record<HazardSeverity, string> = {
-  low: '#fbbf24', // yellow
-  medium: '#f97316', // orange
-  high: '#ef4444', // red
-  critical: '#7f1d1d', // dark red
+  low: '#fbbf24',
+  medium: '#f97316',
+  high: '#ef4444',
+  critical: '#7f1d1d',
 };
